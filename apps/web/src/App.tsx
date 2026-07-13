@@ -1306,6 +1306,7 @@ export default function App() {
             lang={lang}
             projects={projects}
             onTasksChanged={reload}
+            workspaceRole={workspaces.find((item) => item.id === workspaceId)?.role ?? "VIEWER"}
           />
         )}
       </main>

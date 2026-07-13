@@ -46,6 +46,7 @@ import {
   FieldLabel,
 } from "./components/ui/field";
 import { Input } from "./components/ui/input";
+import McpTokensPanel from "./features/settings/McpTokensPanel";
 
 const DocumentsPage = lazy(() => import("./features/documents/DocumentsPage"));
 const PlansPage = lazy(() => import("./features/plans/PlansPage"));
@@ -62,6 +63,7 @@ type Props = {
   lang: "zh" | "en";
   projects: { id: string; name: string }[];
   onTasksChanged: () => Promise<void>;
+  workspaceRole: string;
 };
 type Role = "ADMIN" | "MEMBER" | "VIEWER";
 
@@ -75,6 +77,7 @@ export default function WorkspacePage({
   lang,
   projects,
   onTasksChanged,
+  workspaceRole,
 }: Props) {
   const [members, setMembers] = useState<
       Awaited<ReturnType<typeof api.members>>
@@ -240,6 +243,7 @@ export default function WorkspacePage({
           </CardContent>
         </Card>
       </div>
+      {workspaceRole === "OWNER" || workspaceRole === "ADMIN" ? <McpTokensPanel workspaceId={workspaceId} en={en} /> : null}
     </PageShell>
   );
 }

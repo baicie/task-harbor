@@ -36,4 +36,7 @@ export const api={
   createPlan(workspaceId:string,input:{projectId:string;title:string;goal:string;items:{title:string;description?:string;kind?:Task['kind'];priority?:PlanItem['priority']}[]}){return request<ProjectPlan>(`/workspaces/${workspaceId}/plans`,{method:'POST',body:JSON.stringify(input)})},
   updatePlan(workspaceId:string,planId:string,input:{title?:string;goal?:string;items?:Omit<PlanItem,'id'|'position'|'taskId'>[];version:number}){return request<ProjectPlan>(`/workspaces/${workspaceId}/plans/${planId}`,{method:'PATCH',body:JSON.stringify(input)})},
   applyPlan(workspaceId:string,planId:string){return request<{status:'APPLIED';alreadyApplied:boolean;taskIds:string[]}>(`/workspaces/${workspaceId}/plans/${planId}/apply`,{method:'POST'})},
+  mcpTokens(workspaceId:string){return request<{id:string;name:string;scopes:string[];lastUsedAt:string|null;createdAt:string}[]>(`/workspaces/${workspaceId}/mcp-tokens`)},
+  createMcpToken(workspaceId:string,input:{name:string;write:boolean}){return request<{id:string;name:string;scopes:string[];createdAt:string;token:string}>(`/workspaces/${workspaceId}/mcp-tokens`,{method:'POST',body:JSON.stringify(input)})},
+  revokeMcpToken(workspaceId:string,tokenId:string){return request(`/workspaces/${workspaceId}/mcp-tokens/${tokenId}`,{method:'DELETE'})},
 }
