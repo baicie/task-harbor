@@ -8,5 +8,18 @@ export const projectSchema = z.object({ name: z.string().trim().min(1).max(120),
 export const taskSchema = z.object({ projectId: z.string().uuid(), columnId: z.string().uuid(), title: z.string().trim().min(1).max(300), description: z.string().max(20000).default(''), kind: z.enum(['TASK','STORY','BUG']).default('TASK'), priority: z.enum(['HIGH','MEDIUM','LOW']).default('MEDIUM'), assigneeIds: z.array(z.string().uuid()).max(20).default([]), dueDate: z.string().date().nullable().default(null), labels: z.array(z.string().trim().min(1).max(40)).max(20).default([]) }).strict()
 export const taskPatchSchema = taskSchema.omit({ projectId: true }).partial().extend({ version: z.number().int().positive() }).strict()
 export const commentSchema = z.object({ body: z.string().trim().min(1).max(10000) }).strict()
+export const documentKindSchema = z.enum(['ARCHITECTURE', 'REQUIREMENT', 'DESIGN', 'MEETING', 'RETROSPECTIVE'])
+export const documentStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
+export const documentCreateSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  kind: documentKindSchema.default('DESIGN'),
+  content: z.string().max(200000).default(''),
+  projectId: z.string().uuid().nullable().default(null),
+}).strict()
+export const documentUpdateSchema = documentCreateSchema.partial().extend({
+  status: documentStatusSchema.optional(),
+  changeNote: z.string().trim().max(300).default(''),
+  version: z.number().int().positive(),
+}).strict()
 
 export type ApiErrorResponse = { code: string; message: string; requestId: string; details?: Record<string, unknown> }
