@@ -1,0 +1,29 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_DB: xian, POSTGRES_USER: xian, POSTGRES_PASSWORD: xian }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U xian" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://xian:xian@localhost:5432/xian
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run db:migrate
+      - run: npm run test:integration -w @xian/api
+      - run: npm run build
+      - run: npm audit --audit-level=high
+      - run: docker build -t xian:${{ github.sha }} .

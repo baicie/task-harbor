@@ -1,4 +1,13 @@
 services:
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://xian:xian@postgres:5432/xian
+      APP_ORIGIN: http://localhost:8080
+    ports: ["8080:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
   postgres:
     image: postgres:17-alpine
     environment:

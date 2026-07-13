@@ -4,6 +4,9 @@ import { readFile } from 'node:fs/promises'
 const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL is required')
 const sql = postgres(url, { max: 1 })
-await sql.unsafe(await readFile(new URL('./migrations/0001_init.sql', import.meta.url), 'utf8'))
+await sql`CREATE TABLE IF NOT EXISTS _migrations(name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`
+const name='0001_init.sql'
+const [applied]=await sql`SELECT name FROM _migrations WHERE name=${name}`
+if(!applied) await sql.begin(async transaction=>{await transaction.unsafe(await readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'));await transaction`INSERT INTO _migrations(name) VALUES(${name})`})
 await sql.end()
 console.log('Database migrated')
