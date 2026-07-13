@@ -1,0 +1,22 @@
+import { Body, Controller, Get, Injectable, Param, Patch, Post, Req } from '@nestjs/common'
+import { DatabaseService } from '../database/database.service.js'
+import { projectSchema } from '../common/contracts.js'
+import { AppRequest, parse } from '../common/http.js'
+import { WorkspaceService } from './workspaces.js'
+
+@Injectable()
+export class ProjectService {
+  constructor(private readonly db: DatabaseService, private readonly workspaces: WorkspaceService) {}
+  async list(workspaceId:string,userId:string) { await this.workspaces.role(workspaceId,userId,'project.read'); return this.db.client`SELECT p.id,p.name,p.code,p.description,p.color,p.archived_at AS "archivedAt",u.name AS "leadName" FROM projects p LEFT JOIN users u ON u.id=p.lead_id WHERE p.workspace_id=${workspaceId} AND p.deleted_at IS NULL ORDER BY p.archived_at NULLS FIRST,p.created_at` }
+  async create(workspaceId:string,userId:string,input:ReturnType<typeof projectSchema.parse>) { await this.workspaces.role(workspaceId,userId,'project.create'); return this.db.client.begin(async sql => { const [project]=await sql<{id:string;name:string;code:string}[]>`INSERT INTO projects(workspace_id,name,code,description,color,lead_id) VALUES(${workspaceId},${input.name},${input.code},${input.description},${input.color},${userId}) RETURNING id,name,code`; const defaults=[['待处理','#84908b'],['进行中','#2367d1'],['待验收','#d5792a'],['已完成','#27825a']]; for (const [index,item] of defaults.entries()) await sql`INSERT INTO board_columns(workspace_id,project_id,name,color,position) VALUES(${workspaceId},${project!.id},${item![0]!},${item![1]!},${(index+1)*1000})`; await sql`INSERT INTO project_members(workspace_id,project_id,user_id) VALUES(${workspaceId},${project!.id},${userId})`; await sql`INSERT INTO audit_logs(workspace_id,actor_id,action,entity_type,entity_id,request_id,after_data) VALUES(${workspaceId},${userId},'project.created','project',${project!.id},'system',${sql.json(input)})`; return project }) }
+}
+
+@Controller('workspaces/:workspaceId/projects')
+export class ProjectController {
+  constructor(private readonly projects:ProjectService,private readonly workspaces:WorkspaceService,private readonly db:DatabaseService) {}
+  @Get() list(@Req() req:AppRequest,@Param('workspaceId') workspaceId:string) { return this.projects.list(workspaceId,req.user!.id) }
+  @Post() create(@Req() req:AppRequest,@Param('workspaceId') workspaceId:string,@Body() body:unknown) { return this.projects.create(workspaceId,req.user!.id,parse(projectSchema,body)) }
+  @Get(':projectId/columns') async columns(@Req() req:AppRequest,@Param('workspaceId') workspaceId:string,@Param('projectId') projectId:string) { await this.workspaces.role(workspaceId,req.user!.id,'project.read'); return this.db.client`SELECT id,name,color,position FROM board_columns WHERE workspace_id=${workspaceId} AND project_id=${projectId} ORDER BY position` }
+  @Patch(':projectId') async update(@Req() req:AppRequest,@Param('workspaceId') workspaceId:string,@Param('projectId') projectId:string,@Body() body:unknown) { await this.workspaces.role(workspaceId,req.user!.id,'project.update'); const input=projectSchema.partial().parse(body); const [row]=await this.db.client`UPDATE projects SET name=coalesce(${input.name ?? null},name),description=coalesce(${input.description ?? null},description),color=coalesce(${input.color ?? null},color),updated_at=now() WHERE id=${projectId} AND workspace_id=${workspaceId} RETURNING id,name,code,description,color`; return row }
+  @Post(':projectId/archive') async archive(@Req() req:AppRequest,@Param('workspaceId') workspaceId:string,@Param('projectId') projectId:string) { await this.workspaces.role(workspaceId,req.user!.id,'project.archive'); await this.db.client`UPDATE projects SET archived_at=coalesce(archived_at,now()) WHERE id=${projectId} AND workspace_id=${workspaceId}`; return {ok:true} }
+}
