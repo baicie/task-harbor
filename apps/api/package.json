@@ -20,6 +20,7 @@
     "@node-rs/argon2": "latest",
     "cookie-parser": "latest",
     "drizzle-orm": "latest",
+    "fflate": "^0.8.3",
     "helmet": "latest",
     "postgres": "latest",
     "reflect-metadata": "latest",
