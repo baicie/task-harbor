@@ -19,6 +19,7 @@ COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile --prod && pnpm store prune
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/web/dist public
+RUN mkdir -p /app/data/assets && chown -R node:node /app/data
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/api/v1/health/ready || exit 1

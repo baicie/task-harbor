@@ -110,6 +110,7 @@ import {
 } from "./components/ui/sheet";
 import { Toaster } from "./components/ui/sonner";
 import { ToggleGroup, ToggleGroupItem } from "./components/ui/toggle-group";
+import TaskComments from "./features/tasks/TaskComments";
 
 type Lang = "zh" | "en";
 type Theme = "light" | "dark";
@@ -762,6 +763,7 @@ function TaskDialog({
               />
             </Field>
             {githubReferences?<Field><FieldLabel>{t.taskDetails==='任务详情'?'关联 GitHub':'GitHub links'}</FieldLabel><div className="github-reference-list">{githubReferences.length?githubReferences.map(reference=>{const checked=githubLinks.some(link=>link.kind===reference.kind&&link.number===reference.number),id=`github-reference-${reference.kind}-${reference.number}`;return <div className="github-reference" key={`${reference.kind}:${reference.number}`}><Checkbox id={id} checked={checked} onCheckedChange={()=>setGithubLinks(current=>checked?current.filter(link=>link.kind!==reference.kind||link.number!==reference.number):[...current,reference])}/>{reference.kind==='PR'?<GitPullRequest/>:<CircleDot/>}<label htmlFor={id}><strong>{reference.kind} #{reference.number}</strong><small>{reference.title}</small></label><a href={reference.url} target="_blank" rel="noreferrer" aria-label={`Open ${reference.kind} ${reference.number}`}><ExternalLink/></a></div>}):<p className="github-reference-empty">{t.taskDetails==='任务详情'?'仓库中暂无 Issue 或 PR':'No Issues or pull requests found'}</p>}</div></Field>:null}
+            {draft.id!=="new"?<TaskComments workspaceId={workspaceId} taskId={draft.id} en={t.taskDetails!=="任务详情"}/>:null}
           </FieldGroup></div>
           <SheetFooter className="task-sheet-footer">
             {draft.id!=="new"?<Button type="button" variant="destructive" className="task-delete-button" onClick={()=>setConfirmingDelete(true)}><Trash2 data-icon="inline-start"/>{t.deleteTask}</Button>:null}
