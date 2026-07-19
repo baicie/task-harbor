@@ -11,6 +11,8 @@ export type TaskColumnRole='TITLE'|'DESCRIPTION'|'KIND'|'PRIORITY'|'IGNORE'
 export type TaskWorkbookMapping={titleColumn:number;descriptionColumns:number[];kindColumn:number|null;priorityColumn:number|null}
 export type TaskImportPreview={sheetName:string;headerRow:number;columns:{index:number;header:string;suggestedRole:TaskColumnRole}[];mapping:TaskWorkbookMapping;rows:{title:string;description:string;kind:Task['kind'];priority:'HIGH'|'MEDIUM'|'LOW';sourceRow:number;errors:string[];duplicateInFile:boolean;duplicate:boolean}[];ignoredRows:number;counts:{total:number;valid:number;invalid:number;duplicates:number;ignored:number}}
 export type TaskBulkAction={type:'ASSIGN';assigneeIds:string[]}|{type:'MOVE';columnId:string}|{type:'PRIORITY';priority:'HIGH'|'MEDIUM'|'LOW'}|{type:'DELETE'}
+export type Asset={id:string;originalName:string;contentType:string;sizeBytes:number;sha256:string;createdAt:string;referenceCount:number;deduplicated?:boolean}
+export type TaskComment={id:string;body:string;status:'OPEN'|'RESOLVED';author:string;createdAt:string;assets:{id:string;name:string;contentType:string;sizeBytes:number}[]}
 
 async function uploadFields<T>(path:string,file:File,fields:Record<string,string>){const body=new FormData();body.append('file',file);Object.entries(fields).forEach(([key,value])=>body.append(key,value));const response=await fetch('/api/v1'+path,{method:'POST',body,credentials:'include',headers:csrf?{'x-csrf-token':csrf}:{}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||'上传失败');return data as T}
 
@@ -37,6 +39,13 @@ export const api={
   updateTask(workspaceId:string,task:Task){return request<{id:string;version:number}>(`/workspaces/${workspaceId}/tasks/${task.id}`,{method:'PATCH',body:JSON.stringify({title:task.title,description:task.description,kind:task.kind,columnId:task.column,priority:{高:'HIGH',中:'MEDIUM',低:'LOW'}[task.priority],assigneeIds:task.assigneeId?[task.assigneeId]:[],dueDate:task.due||null,labels:task.tags,version:task.version})})},
   bulkUpdateTasks(workspaceId:string,taskIds:string[],action:TaskBulkAction){return request<{updated:number}>(`/workspaces/${workspaceId}/tasks/bulk`,{method:'PATCH',body:JSON.stringify({taskIds,action})})},
   deleteTask(workspaceId:string,taskId:string){return request<{ok:true}>(`/workspaces/${workspaceId}/tasks/${taskId}`,{method:'DELETE'})},
+  taskComments(workspaceId:string,taskId:string){return request<TaskComment[]>(`/workspaces/${workspaceId}/tasks/${taskId}/comments`)},
+  createTaskComment(workspaceId:string,taskId:string,input:{body:string;status:'OPEN'|'RESOLVED';assetIds:string[]}){return request<TaskComment>(`/workspaces/${workspaceId}/tasks/${taskId}/comments`,{method:'POST',body:JSON.stringify(input)})},
+  updateTaskComment(workspaceId:string,taskId:string,commentId:string,status:'OPEN'|'RESOLVED'){return request<{id:string;status:'OPEN'|'RESOLVED'}>(`/workspaces/${workspaceId}/tasks/${taskId}/comments/${commentId}`,{method:'PATCH',body:JSON.stringify({status})})},
+  assets(workspaceId:string){return request<{assets:Asset[];usage:{usedBytes:number;quotaBytes:number}}>(`/workspaces/${workspaceId}/assets`)},
+  uploadAsset(workspaceId:string,file:File){return upload<Asset&{deduplicated:boolean}>(`/workspaces/${workspaceId}/assets`,file)},
+  deleteAsset(workspaceId:string,assetId:string){return request<{ok:true}>(`/workspaces/${workspaceId}/assets/${assetId}`,{method:'DELETE'})},
+  assetUrl(workspaceId:string,assetId:string){return `${base}/workspaces/${workspaceId}/assets/${assetId}`},
   previewTaskImport(workspaceId:string,file:File,projectId:string,mapping?:TaskWorkbookMapping){return uploadFields<TaskImportPreview>(`/workspaces/${workspaceId}/tasks/import/xlsx/preview`,file,{projectId,...(mapping?{mapping:JSON.stringify(mapping)}:{})})},
   importTasks(workspaceId:string,file:File,projectId:string,columnId:string,mapping:TaskWorkbookMapping){return uploadFields<{imported:number;invalidRows:number;duplicateRows:number;ignoredRows:number;sheetName:string}>(`/workspaces/${workspaceId}/tasks/import/xlsx`,file,{projectId,columnId,mapping:JSON.stringify(mapping)})},
   documents(workspaceId:string){return request<DocumentSummary[]>(`/workspaces/${workspaceId}/documents`)},
@@ -53,7 +62,7 @@ export const api={
   createMcpToken(workspaceId:string,input:{name:string;write:boolean}){return request<{id:string;name:string;scopes:string[];createdAt:string;token:string}>(`/workspaces/${workspaceId}/mcp-tokens`,{method:'POST',body:JSON.stringify(input)})},
   revokeMcpToken(workspaceId:string,tokenId:string){return request(`/workspaces/${workspaceId}/mcp-tokens/${tokenId}`,{method:'DELETE'})},
   async exportWorkspace(workspaceId:string){const response=await fetch(`${base}/workspaces/${workspaceId}/export`,{credentials:'include'});if(!response.ok)throw new Error('导出失败');return{blob:await response.blob(),filename:response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]||'workspace.taskharbor.zip'}},
-  previewImport(file:File){return upload<{workspaceName:string;suggestedName:string;counts:{members:number;projects:number;tasks:number;documents:number;plans:number}}>('/workspaces/import/preview',file)},
+  previewImport(file:File){return upload<{workspaceName:string;suggestedName:string;counts:{members:number;projects:number;tasks:number;documents:number;plans:number;assets:number}}>('/workspaces/import/preview',file)},
   importWorkspace(file:File){return upload<{id:string;name:string}>('/workspaces/import',file)},
   githubIntegration(workspaceId:string){return request<{projectId:string;owner:string;repo:string;tokenLast4:string;syncTasks:boolean;syncDocuments:boolean;pullIssues:boolean;updatedAt:string}|null>(`/workspaces/${workspaceId}/integrations/github`)},
   configureGitHub(workspaceId:string,input:{repoUrl:string;token:string;projectId:string;syncTasks:boolean;syncDocuments:boolean;pullIssues:boolean}){return request(`/workspaces/${workspaceId}/integrations/github`,{method:'PUT',body:JSON.stringify(input)})},

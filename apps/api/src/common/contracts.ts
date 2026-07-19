@@ -21,7 +21,7 @@ export const taskBulkSchema = z.object({
     z.object({ type: z.literal('DELETE') }).strict(),
   ]),
 }).strict()
-export const commentSchema = z.object({ body: z.string().trim().min(1).max(10000) }).strict()
+export const commentSchema = z.object({ body: z.string().trim().min(1).max(10000), status: z.enum(['OPEN','RESOLVED']).default('OPEN'), assetIds: z.array(z.string().uuid()).max(12).default([]) }).strict()
 export const documentKindSchema = z.enum(['ARCHITECTURE', 'REQUIREMENT', 'DESIGN', 'MEETING', 'RETROSPECTIVE'])
 export const documentStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
 export const documentCreateSchema = z.object({

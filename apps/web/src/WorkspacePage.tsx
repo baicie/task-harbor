@@ -51,6 +51,7 @@ import { Input } from "./components/ui/input";
 import McpTokensPanel from "./features/settings/McpTokensPanel";
 import TransferPanel from "./features/settings/TransferPanel";
 import GitHubPanel from "./features/settings/GitHubPanel";
+import AssetsPanel from "./features/settings/AssetsPanel";
 
 const DocumentsPage = lazy(() => import("./features/documents/DocumentsPage"));
 const PlansPage = lazy(() => import("./features/plans/PlansPage"));
@@ -251,6 +252,7 @@ export default function WorkspacePage({
       </div>
       {workspaceRole === "OWNER" || workspaceRole === "ADMIN" ? <McpTokensPanel workspaceId={workspaceId} en={en} /> : null}
       {workspaceRole === "OWNER" || workspaceRole === "ADMIN" ? <GitHubPanel workspaceId={workspaceId} projects={projects} en={en} onTasksChanged={onTasksChanged} /> : null}
+      {workspaceRole === "OWNER" || workspaceRole === "ADMIN" ? <AssetsPanel workspaceId={workspaceId} en={en} /> : null}
       <TransferPanel workspaceId={workspaceId} en={en} onRestored={onWorkspaceRestored} />
     </PageShell>
   );
