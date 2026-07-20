@@ -1,0 +1,3 @@
+ALTER TABLE workspaces
+  ADD COLUMN asset_quota_bytes bigint NOT NULL DEFAULT 268435456
+  CHECK (asset_quota_bytes BETWEEN 1048576 AND 109951162777600);

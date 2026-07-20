@@ -8,7 +8,7 @@ describe('task type contract',()=>{
     expect(taskSchema.parse({...base,kind:'BUG'}).kind).toBe('BUG')
   })
   it('does not inject create defaults into partial updates',()=>expect(taskPatchSchema.parse({version:1})).toEqual({version:1}))
-  it('accepts one bulk action and rejects duplicate task ids',()=>{const id='33333333-3333-4333-8333-333333333333';expect(taskBulkSchema.parse({taskIds:[id],action:{type:'PRIORITY',priority:'HIGH'}}).action.type).toBe('PRIORITY');expect(taskBulkSchema.safeParse({taskIds:[id,id],action:{type:'DELETE'}}).success).toBe(false)})
+  it('accepts bulk priority and type actions and rejects duplicate task ids',()=>{const id='33333333-3333-4333-8333-333333333333';expect(taskBulkSchema.parse({taskIds:[id],action:{type:'PRIORITY',priority:'HIGH'}}).action.type).toBe('PRIORITY');expect(taskBulkSchema.parse({taskIds:[id],action:{type:'KIND',kind:'BUG'}}).action).toEqual({type:'KIND',kind:'BUG'});expect(taskBulkSchema.safeParse({taskIds:[id,id],action:{type:'DELETE'}}).success).toBe(false)})
 })
 
 describe('plan contract', () => {

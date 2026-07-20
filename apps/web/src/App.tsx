@@ -111,6 +111,7 @@ import {
 import { Toaster } from "./components/ui/sonner";
 import { ToggleGroup, ToggleGroupItem } from "./components/ui/toggle-group";
 import TaskComments from "./features/tasks/TaskComments";
+import TaskSubtasks from "./features/tasks/TaskSubtasks";
 
 type Lang = "zh" | "en";
 type Theme = "light" | "dark";
@@ -180,7 +181,9 @@ const copy = {
     changeAssignee: "更改负责人",
     unassigned: "取消指派",
     changeStatus: "移动状态",
+    changeType: "修改类型",
     changePriority: "修改优先级",
+    quickEntry: "输入任务标题，按回车创建",
     bulkDelete: "批量删除",
     bulkDeleteTitle: "删除所选任务？",
     bulkDeleteDescription: "所选任务将被软删除，并从当前项目中隐藏。",
@@ -251,7 +254,9 @@ const copy = {
     changeAssignee: "Change assignee",
     unassigned: "Unassign",
     changeStatus: "Move status",
+    changeType: "Change type",
     changePriority: "Change priority",
+    quickEntry: "Enter a task title and press Enter",
     bulkDelete: "Delete selected",
     bulkDeleteTitle: "Delete selected tasks?",
     bulkDeleteDescription: "The selected tasks will be soft deleted and hidden from this project.",
@@ -763,6 +768,7 @@ function TaskDialog({
               />
             </Field>
             {githubReferences?<Field><FieldLabel>{t.taskDetails==='任务详情'?'关联 GitHub':'GitHub links'}</FieldLabel><div className="github-reference-list">{githubReferences.length?githubReferences.map(reference=>{const checked=githubLinks.some(link=>link.kind===reference.kind&&link.number===reference.number),id=`github-reference-${reference.kind}-${reference.number}`;return <div className="github-reference" key={`${reference.kind}:${reference.number}`}><Checkbox id={id} checked={checked} onCheckedChange={()=>setGithubLinks(current=>checked?current.filter(link=>link.kind!==reference.kind||link.number!==reference.number):[...current,reference])}/>{reference.kind==='PR'?<GitPullRequest/>:<CircleDot/>}<label htmlFor={id}><strong>{reference.kind} #{reference.number}</strong><small>{reference.title}</small></label><a href={reference.url} target="_blank" rel="noreferrer" aria-label={`Open ${reference.kind} ${reference.number}`}><ExternalLink/></a></div>}):<p className="github-reference-empty">{t.taskDetails==='任务详情'?'仓库中暂无 Issue 或 PR':'No Issues or pull requests found'}</p>}</div></Field>:null}
+            {draft.id!=="new"?<TaskSubtasks workspaceId={workspaceId} taskId={draft.id} en={t.taskDetails!=="任务详情"}/>:null}
             {draft.id!=="new"?<TaskComments workspaceId={workspaceId} taskId={draft.id} en={t.taskDetails!=="任务详情"}/>:null}
           </FieldGroup></div>
           <SheetFooter className="task-sheet-footer">
@@ -1014,7 +1020,9 @@ export default function App() {
     [importBusy,setImportBusy]=useState(false),
     [selectedTaskIds,setSelectedTaskIds]=useState<string[]>([]),
     [bulkBusy,setBulkBusy]=useState(false),
-    [confirmingBulkDelete,setConfirmingBulkDelete]=useState(false);
+    [confirmingBulkDelete,setConfirmingBulkDelete]=useState(false),
+    [quickTitle,setQuickTitle]=useState(''),
+    [quickBusy,setQuickBusy]=useState(false);
   const [page, setPage] = useState<Page>("tasks"),
     [activeProject, setActiveProject] = useState(0),
     [view, setView] = useState<"board" | "list">("board"),
@@ -1151,6 +1159,17 @@ export default function App() {
         version: 1,
       });
   };
+  const quickCreate=async(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault()
+    const title=quickTitle.trim(),column=columns[0]
+    if(!title||!project||!column)return
+    setQuickBusy(true);setError('')
+    try{
+      await api.createTask(workspaceId,{id:'new',number:0,projectId:project.id,title,kind:'TASK',column:column.id,priority:'中',assignee:user,assigneeId:members.find(member=>member.name===user)?.id??'',due:'',tags:[],description:'',version:1})
+      setQuickTitle('');await reload();toast.success(lang==='zh'?'任务已创建':'Task created')
+    }catch(reason){setError(reason instanceof Error?reason.message:(lang==='zh'?'创建失败':'Creation failed'))}
+    finally{setQuickBusy(false)}
+  }
   const closeTaskImport=()=>{setImportFile(null);setImportPreview(null);setImportMapping(null);setImportBusy(false);if(importRef.current)importRef.current.value=''}
   const previewTaskImport=async(file:File,mapping?:TaskWorkbookMapping)=>{
     if(!project)return
@@ -1364,6 +1383,11 @@ export default function App() {
                 </p>
               ) : null}
             </section>
+            <form className="quick-entry" onSubmit={quickCreate}>
+              <Plus aria-hidden="true"/>
+              <Input aria-label={t.quickEntry} placeholder={t.quickEntry} value={quickTitle} maxLength={300} disabled={quickBusy} onChange={event=>setQuickTitle(event.target.value)}/>
+              <Button type="submit" size="sm" disabled={quickBusy||!quickTitle.trim()}>{quickBusy?(lang==='zh'?'创建中…':'Creating…'):(lang==='zh'?'创建':'Create')}</Button>
+            </form>
             <section className="toolbar">
               <ToggleGroup
                 value={[view]}
@@ -1404,6 +1428,7 @@ export default function App() {
               <Button size="sm" disabled={bulkBusy||!userId} onClick={()=>void applyBulk({type:'ASSIGN',assigneeIds:[userId]},'assigned')}><UserRoundCheck data-icon="inline-start"/>{t.assignToMe}</Button>
               <DropdownMenu><DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" disabled={bulkBusy}/>}>{t.changeAssignee}<ChevronDown data-icon="inline-end"/></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup><DropdownMenuLabel>{t.assignee}</DropdownMenuLabel><DropdownMenuItem onClick={()=>void applyBulk({type:'ASSIGN',assigneeIds:[]},'unassigned')}>{t.unassigned}</DropdownMenuItem><DropdownMenuSeparator/>{members.filter(member=>!member.disabledAt).map(member=><DropdownMenuItem key={member.id} onClick={()=>void applyBulk({type:'ASSIGN',assigneeIds:[member.id]},'assigned')}>{member.name}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
               <DropdownMenu><DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" disabled={bulkBusy}/>}>{t.changeStatus}<ChevronDown data-icon="inline-end"/></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup><DropdownMenuLabel>{t.status}</DropdownMenuLabel>{columns.map(column=><DropdownMenuItem key={column.id} onClick={()=>void applyBulk({type:'MOVE',columnId:column.id},'moved')}><ArrowRight/>{column.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
+              <DropdownMenu><DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" disabled={bulkBusy}/>}>{t.changeType}<ChevronDown data-icon="inline-end"/></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup><DropdownMenuLabel>{t.type}</DropdownMenuLabel>{([['TASK',t.task],['STORY',t.story],['BUG',t.bug]] as const).map(([nextKind,label])=><DropdownMenuItem key={nextKind} onClick={()=>void applyBulk({type:'KIND',kind:nextKind},'updated')}><List/>{label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
               <DropdownMenu><DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" disabled={bulkBusy}/>}>{t.changePriority}<ChevronDown data-icon="inline-end"/></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup><DropdownMenuLabel>{t.priority}</DropdownMenuLabel>{([['HIGH',t.high],['MEDIUM',t.medium],['LOW',t.low]] as const).map(([priority,label])=><DropdownMenuItem key={priority} onClick={()=>void applyBulk({type:'PRIORITY',priority},'updated')}><Flag/>{label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
               <Button type="button" size="sm" variant="destructive" disabled={bulkBusy} onClick={()=>setConfirmingBulkDelete(true)}><Trash2 data-icon="inline-start"/>{t.bulkDelete}</Button>
               <Button type="button" size="icon-sm" variant="ghost" aria-label={t.clearSelection} disabled={bulkBusy} onClick={()=>setSelectedTaskIds([])}><X/></Button>
