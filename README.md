@@ -35,3 +35,4 @@ GitHub PAT 需要仓库的 Issues 与 Contents 读写权限。`APP_ENCRYPTION_KE
 - 健康检查：`/api/v1/health/live`、`/api/v1/health/ready`
 - 镜像只使用 commit SHA 发布；回滚时重新部署上一 SHA。
 - 数据库迁移在应用启动前执行，迁移记录保存在 `_migrations`。
+- 生产附件持久化、自动备份、恢复演练和回滚步骤见 [`docs/operations.md`](docs/operations.md)。

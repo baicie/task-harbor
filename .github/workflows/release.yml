@@ -95,6 +95,12 @@ jobs:
             esac
             export APP_PORT
 
+            APP_ORIGIN='${{ secrets.PERF_APP_ORIGIN }}'
+            if [ -z "$APP_ORIGIN" ]; then
+              APP_ORIGIN="http://${{ secrets.PERF_VM_HOST }}:${APP_PORT}"
+            fi
+            export APP_ORIGIN
+
             ENCRYPTION_KEY_FILE="$APP_DIR/.app-encryption-key"
             if [ ! -s "$ENCRYPTION_KEY_FILE" ]; then
               openssl rand -hex 32 > "$ENCRYPTION_KEY_FILE"
@@ -102,17 +108,30 @@ jobs:
             fi
             export APP_ENCRYPTION_KEY="$(cat "$ENCRYPTION_KEY_FILE")"
 
+            DB_PASSWORD_FILE="$APP_DIR/.db-password"
+            if [ ! -s "$DB_PASSWORD_FILE" ]; then
+              openssl rand -hex 32 > "$DB_PASSWORD_FILE"
+              chmod 600 "$DB_PASSWORD_FILE"
+            fi
+            export POSTGRES_PASSWORD="$(cat "$DB_PASSWORD_FILE")"
+            export APP_IMAGE="$IMAGE"
+
+            PREVIOUS_IMAGE="$(docker compose ps -q app 2>/dev/null | xargs -r docker inspect --format '{{.Config.Image}}' 2>/dev/null || true)"
+
             cat > docker-compose.yml <<'COMPOSE'
             services:
               app:
-                image: ${{ env.IMAGE_NAME }}:git-${{ github.sha }}
+                image: ${APP_IMAGE}
                 restart: unless-stopped
                 environment:
-                  DATABASE_URL: postgres://xian:xian@postgres:5432/xian
-                  APP_ORIGIN: http://${{ secrets.PERF_VM_HOST }}:${APP_PORT}
+                  DATABASE_URL: postgres://xian:${POSTGRES_PASSWORD}@postgres:5432/xian
+                  APP_ORIGIN: ${APP_ORIGIN}
                   APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+                  ASSET_STORAGE_ROOT: /app/data/assets
                 ports:
                   - "${APP_PORT}:8080"
+                volumes:
+                  - xian-assets:/app/data/assets
                 depends_on:
                   postgres:
                     condition: service_healthy
@@ -122,7 +141,7 @@ jobs:
                 environment:
                   POSTGRES_DB: xian
                   POSTGRES_USER: xian
-                  POSTGRES_PASSWORD: xian
+                  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
                 volumes:
                   - xian-data:/var/lib/postgresql/data
                 healthcheck:
@@ -130,15 +149,53 @@ jobs:
                   interval: 3s
                   timeout: 3s
                   retries: 10
+              backup:
+                image: postgres:17-alpine
+                restart: unless-stopped
+                environment:
+                  PGPASSWORD: ${POSTGRES_PASSWORD}
+                  BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+                  BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+                volumes:
+                  - xian-assets:/data/assets:ro
+                  - xian-backups:/backups
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                entrypoint: ["/bin/sh", "-c"]
+                command:
+                  - |
+                    while true; do
+                      stamp=$$(date -u +%Y%m%dT%H%M%SZ)
+                      pg_dump -h postgres -U xian -d xian -Fc > "/backups/db-$${stamp}.dump" &&
+                      tar -czf "/backups/assets-$${stamp}.tar.gz" -C /data/assets .
+                      find /backups -type f -mtime +$${BACKUP_RETENTION_DAYS} -delete
+                      sleep "$${BACKUP_INTERVAL_SECONDS}"
+                    done
             volumes:
               xian-data:
+              xian-assets:
+              xian-backups:
             COMPOSE
 
             docker pull "$IMAGE"
+            docker compose up -d postgres
+            for i in $(seq 1 30); do
+              if docker compose exec -T postgres pg_isready -U xian -d xian >/dev/null 2>&1; then break; fi
+              if [ "$i" -eq 30 ]; then docker compose logs postgres --tail=100; exit 1; fi
+              sleep 2
+            done
+            docker compose exec -T postgres psql -U xian -d xian -v ON_ERROR_STOP=1 -c "ALTER USER xian PASSWORD '$POSTGRES_PASSWORD'"
+            docker compose run --rm --no-deps --entrypoint /bin/sh backup -c '
+              stamp=$(date -u +%Y%m%dT%H%M%SZ)
+              pg_dump -h postgres -U xian -d xian -Fc > "/backups/predeploy-${stamp}.dump" &&
+              tar -czf "/backups/predeploy-assets-${stamp}.tar.gz" -C /data/assets .
+            '
             docker compose up -d --remove-orphans
 
             for i in $(seq 1 60); do
               if curl -fsS "http://127.0.0.1:${APP_PORT}/api/v1/health/ready" >/dev/null 2>&1; then
+                curl -fsS "http://127.0.0.1:${APP_PORT}/" >/dev/null
                 echo "task-harbor healthy on port ${APP_PORT} after ${i}s"
                 docker image prune -f >/dev/null 2>&1 || true
                 exit 0
@@ -147,4 +204,9 @@ jobs:
             done
 
             docker compose logs app --tail=100
+            if [ -n "$PREVIOUS_IMAGE" ]; then
+              echo "Health check failed; rolling back to $PREVIOUS_IMAGE"
+              export APP_IMAGE="$PREVIOUS_IMAGE"
+              docker compose up -d app
+            fi
             exit 1

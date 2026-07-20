@@ -10,6 +10,15 @@ export type AppRequest = Request & { user?: AuthUser; requestId: string }
 export const Public = () => SetMetadata('public', true)
 export const sessionHash = (token: string) => createHash('sha256').update(token).digest('hex')
 export const requestContext = (req: AppRequest, res: Response, next: NextFunction) => { req.requestId = String(req.headers['x-request-id'] || randomUUID()); res.setHeader('x-request-id', req.requestId); next() }
+export const requestLogger = (req: AppRequest, res: Response, next: NextFunction) => {
+  const startedAt = process.hrtime.bigint()
+  res.on('finish', () => {
+    if (req.path.endsWith('/health/live')) return
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
+    process.stdout.write(`${JSON.stringify({ level: res.statusCode >= 500 ? 'error' : 'info', type: 'http_request', requestId: req.requestId, method: req.method, path: req.path, status: res.statusCode, durationMs: Math.round(durationMs * 10) / 10, userId: req.user?.id ?? null })}\n`)
+  })
+  next()
+}
 export function parse<T>(schema: ZodType<T>, value: unknown): T { const result = schema.safeParse(value); if (!result.success) throw new BadRequestException({ code: 'VALIDATION_ERROR', message: '请求参数无效', details: result.error.flatten() }); return result.data }
 
 @Injectable()

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Post, Req, Res, UnauthorizedException } from '@nestjs/common'
+import { Body, ConflictException, Controller, Get, HttpException, HttpStatus, Injectable, Post, Req, Res, UnauthorizedException } from '@nestjs/common'
 import { hash, verify } from '@node-rs/argon2'
 import { randomBytes } from 'node:crypto'
 import type { Response } from 'express'
@@ -11,7 +11,13 @@ export class AuthService {
   private readonly attempts = new Map<string, { count: number; reset: number }>()
   constructor(private readonly db: DatabaseService) {}
 
-  private limit(ip: string) { const now = Date.now(); const item = this.attempts.get(ip); if (!item || item.reset < now) return this.attempts.set(ip, { count: 1, reset: now + 60_000 }); if (++item.count > 10) throw new BadRequestException({ code: 'LOGIN_RATE_LIMIT', message: '尝试次数过多，请稍后再试' }) }
+  private limit(key: string, maximum: number) {
+    const now = Date.now(), item = this.attempts.get(key)
+    if (this.attempts.size > 10_000) for (const [attemptKey, attempt] of this.attempts) if (attempt.reset < now) this.attempts.delete(attemptKey)
+    if (!item || item.reset < now) { this.attempts.set(key, { count: 1, reset: now + 60_000 }); return }
+    item.count += 1
+    if (item.count > maximum) throw new HttpException({ code: 'LOGIN_RATE_LIMIT', message: '尝试次数过多，请稍后再试' }, HttpStatus.TOO_MANY_REQUESTS)
+  }
   async register(input: ReturnType<typeof registerSchema.parse>) {
     const passwordHash = await hash(input.password, { algorithm: 2 })
     const slug = `${input.workspaceName.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').slice(0, 32)}-${randomBytes(3).toString('hex')}`
@@ -30,11 +36,16 @@ export class AuthService {
     }
   }
   async login(email: string, password: string, ip: string) {
-    this.limit(ip)
+    const attemptKey = `${ip}:${email.toLowerCase()}`
+    const addressKey = `ip:${ip}`
+    this.limit(attemptKey, 10)
+    this.limit(addressKey, 30)
     const [user] = await this.db.client<{ id: string; email: string; name: string; password_hash: string }[]>`SELECT id,email,name,password_hash FROM users WHERE email=${email.toLowerCase()} AND disabled_at IS NULL`
     if (!user || !(await verify(user.password_hash, password))) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: '邮箱或密码错误' })
     const token = randomBytes(32).toString('base64url'), csrfToken = randomBytes(36).toString('base64url')
     await this.db.client`INSERT INTO sessions(id,user_id,csrf_token,expires_at) VALUES(${sessionHash(token)},${user.id},${csrfToken},now()+interval '30 days')`
+    this.attempts.delete(attemptKey)
+    this.attempts.delete(addressKey)
     return { token, csrfToken, user: { id: user.id, email: user.email, name: user.name } }
   }
 }

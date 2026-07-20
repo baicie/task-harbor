@@ -27,5 +27,7 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm --filter @xian/api test:integration
       - run: pnpm build
+      - run: pnpm --filter @xian/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @xian/web test:e2e
       - run: pnpm --registry=https://registry.npmjs.org audit --audit-level=high
       - run: docker build --build-arg APP_COMMIT=${{ github.sha }} -t xian:${{ github.sha }} .
