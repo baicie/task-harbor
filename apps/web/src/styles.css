@@ -38,7 +38,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background:var(--ui-background); }
 button, input, textarea, select { font: inherit; }
-button { color: inherit; }
+button:not([data-slot="button"]) { color: inherit; }
 .boot { min-height:100vh;display:grid;place-items:center;color:var(--muted); }
 .auth-page { min-height:100vh;display:grid;grid-template-columns:minmax(320px,.9fr) minmax(420px,1.1fr);background:#f7f9fc; }
 .auth-note { padding:clamp(32px,7vw,88px);display:flex;flex-direction:column;justify-content:space-between;color:#17324d;background:#edf6ff;border-right:1px solid #dceaf8; }
