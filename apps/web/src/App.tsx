@@ -141,6 +141,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "./components/ui/toggle-group";
 import TaskComments from "./features/tasks/TaskComments";
 import TaskSubtasks from "./features/tasks/TaskSubtasks";
+import TaskTypeFieldsEditor from "./features/tasks/TaskTypeFields";
 
 type Lang = "zh" | "en";
 type Theme = "light" | "dark";
@@ -784,6 +785,7 @@ function TaskDialog({
                 onChange={(event)=>setDraft({...draft,description:event.target.value})}
               />
             </Field>
+            <TaskTypeFieldsEditor kind={draft.kind} value={draft.typeFields} en={t.taskDetails!=="任务详情"} onChange={typeFields=>setDraft({...draft,typeFields})}/>
             {githubReferences?<Field><FieldLabel>{t.taskDetails==='任务详情'?'关联 GitHub':'GitHub links'}</FieldLabel><div className="github-reference-list">{githubReferences.length?githubReferences.map(reference=>{const checked=githubLinks.some(link=>link.kind===reference.kind&&link.number===reference.number),id=`github-reference-${reference.kind}-${reference.number}`;return <div className="github-reference" key={`${reference.kind}:${reference.number}`}><Checkbox id={id} checked={checked} onCheckedChange={()=>setGithubLinks(current=>checked?current.filter(link=>link.kind!==reference.kind||link.number!==reference.number):[...current,reference])}/>{reference.kind==='PR'?<GitPullRequest/>:<CircleDot/>}<label htmlFor={id}><strong>{reference.kind} #{reference.number}</strong><small>{reference.title}</small></label><a href={reference.url} target="_blank" rel="noreferrer" aria-label={`Open ${reference.kind} ${reference.number}`}><ExternalLink/></a></div>}):<p className="github-reference-empty">{t.taskDetails==='任务详情'?'仓库中暂无 Issue 或 PR':'No Issues or pull requests found'}</p>}</div></Field>:null}
             {draft.id!=="new"?<TaskSubtasks workspaceId={workspaceId} taskId={draft.id} en={t.taskDetails!=="任务详情"} onChanged={onSubtasksChanged}/>:null}
             {draft.id!=="new"?<TaskComments workspaceId={workspaceId} taskId={draft.id} en={t.taskDetails!=="任务详情"}/>:null}

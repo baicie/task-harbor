@@ -21,3 +21,14 @@ export function createTaskTypeFields():TaskTypeFields{
     reproductionSteps:'',expectedResult:'',actualResult:'',environment:'',severity:'MAJOR',affectedVersion:'',
   }
 }
+
+const fieldKeys={
+  TASK:['workContent','completionCriteria'],
+  STORY:['userStory','background','acceptanceCriteria','businessValue'],
+  BUG:['reproductionSteps','expectedResult','actualResult','environment','severity','affectedVersion'],
+} as const satisfies Record<TaskKind,readonly (keyof TaskTypeFields)[]>
+
+export function taskTypeFieldKeys(kind:TaskKind):readonly (keyof TaskTypeFields)[]{
+  return fieldKeys[kind]
+}
+import type { TaskKind } from './board'
