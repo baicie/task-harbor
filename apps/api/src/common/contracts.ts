@@ -17,6 +17,7 @@ export const taskBulkSchema = z.object({
   action: z.discriminatedUnion('type', [
     z.object({ type: z.literal('ASSIGN'), assigneeIds: z.array(z.string().uuid()).max(20) }).strict(),
     z.object({ type: z.literal('MOVE'), columnId: z.string().uuid() }).strict(),
+    z.object({ type: z.literal('KIND'), kind: z.enum(['TASK', 'STORY', 'BUG']) }).strict(),
     z.object({ type: z.literal('PRIORITY'), priority: z.enum(['HIGH', 'MEDIUM', 'LOW']) }).strict(),
     z.object({ type: z.literal('DELETE') }).strict(),
   ]),

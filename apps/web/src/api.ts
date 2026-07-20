@@ -10,7 +10,8 @@ export type GitHubReference={kind:'ISSUE'|'PR';number:number;title:string;url:st
 export type TaskColumnRole='TITLE'|'DESCRIPTION'|'KIND'|'PRIORITY'|'IGNORE'
 export type TaskWorkbookMapping={titleColumn:number;descriptionColumns:number[];kindColumn:number|null;priorityColumn:number|null}
 export type TaskImportPreview={sheetName:string;headerRow:number;columns:{index:number;header:string;suggestedRole:TaskColumnRole}[];mapping:TaskWorkbookMapping;rows:{title:string;description:string;kind:Task['kind'];priority:'HIGH'|'MEDIUM'|'LOW';sourceRow:number;errors:string[];duplicateInFile:boolean;duplicate:boolean}[];ignoredRows:number;counts:{total:number;valid:number;invalid:number;duplicates:number;ignored:number}}
-export type TaskBulkAction={type:'ASSIGN';assigneeIds:string[]}|{type:'MOVE';columnId:string}|{type:'PRIORITY';priority:'HIGH'|'MEDIUM'|'LOW'}|{type:'DELETE'}
+export type TaskBulkAction={type:'ASSIGN';assigneeIds:string[]}|{type:'MOVE';columnId:string}|{type:'KIND';kind:Task['kind']}|{type:'PRIORITY';priority:'HIGH'|'MEDIUM'|'LOW'}|{type:'DELETE'}
+export type Subtask={id:string;title:string;isDone:boolean;position:number}
 export type Asset={id:string;originalName:string;contentType:string;sizeBytes:number;sha256:string;createdAt:string;referenceCount:number;deduplicated?:boolean}
 export type TaskComment={id:string;body:string;status:'OPEN'|'RESOLVED';author:string;createdAt:string;assets:{id:string;name:string;contentType:string;sizeBytes:number}[]}
 
@@ -39,10 +40,15 @@ export const api={
   updateTask(workspaceId:string,task:Task){return request<{id:string;version:number}>(`/workspaces/${workspaceId}/tasks/${task.id}`,{method:'PATCH',body:JSON.stringify({title:task.title,description:task.description,kind:task.kind,columnId:task.column,priority:{高:'HIGH',中:'MEDIUM',低:'LOW'}[task.priority],assigneeIds:task.assigneeId?[task.assigneeId]:[],dueDate:task.due||null,labels:task.tags,version:task.version})})},
   bulkUpdateTasks(workspaceId:string,taskIds:string[],action:TaskBulkAction){return request<{updated:number}>(`/workspaces/${workspaceId}/tasks/bulk`,{method:'PATCH',body:JSON.stringify({taskIds,action})})},
   deleteTask(workspaceId:string,taskId:string){return request<{ok:true}>(`/workspaces/${workspaceId}/tasks/${taskId}`,{method:'DELETE'})},
+  subtasks(workspaceId:string,taskId:string){return request<Subtask[]>(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks`)},
+  createSubtask(workspaceId:string,taskId:string,title:string){return request<Subtask>(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks`,{method:'POST',body:JSON.stringify({title})})},
+  updateSubtask(workspaceId:string,taskId:string,subtaskId:string,input:{title?:string;isDone?:boolean}){return request<Subtask>(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks/${subtaskId}`,{method:'PATCH',body:JSON.stringify(input)})},
+  deleteSubtask(workspaceId:string,taskId:string,subtaskId:string){return request<{ok:true}>(`/workspaces/${workspaceId}/tasks/${taskId}/subtasks/${subtaskId}`,{method:'DELETE'})},
   taskComments(workspaceId:string,taskId:string){return request<TaskComment[]>(`/workspaces/${workspaceId}/tasks/${taskId}/comments`)},
   createTaskComment(workspaceId:string,taskId:string,input:{body:string;status:'OPEN'|'RESOLVED';assetIds:string[]}){return request<TaskComment>(`/workspaces/${workspaceId}/tasks/${taskId}/comments`,{method:'POST',body:JSON.stringify(input)})},
   updateTaskComment(workspaceId:string,taskId:string,commentId:string,status:'OPEN'|'RESOLVED'){return request<{id:string;status:'OPEN'|'RESOLVED'}>(`/workspaces/${workspaceId}/tasks/${taskId}/comments/${commentId}`,{method:'PATCH',body:JSON.stringify({status})})},
   assets(workspaceId:string){return request<{assets:Asset[];usage:{usedBytes:number;quotaBytes:number}}>(`/workspaces/${workspaceId}/assets`)},
+  updateAssetQuota(workspaceId:string,quotaBytes:number){return request<{usedBytes:number;quotaBytes:number}>(`/workspaces/${workspaceId}/assets/quota`,{method:'PATCH',body:JSON.stringify({quotaBytes})})},
   uploadAsset(workspaceId:string,file:File){return upload<Asset&{deduplicated:boolean}>(`/workspaces/${workspaceId}/assets`,file)},
   deleteAsset(workspaceId:string,assetId:string){return request<{ok:true}>(`/workspaces/${workspaceId}/assets/${assetId}`,{method:'DELETE'})},
   assetUrl(workspaceId:string,assetId:string){return `${base}/workspaces/${workspaceId}/assets/${assetId}`},
