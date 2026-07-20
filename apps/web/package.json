@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "vitest run"
+    "test": "vitest run src",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -32,6 +33,7 @@
     "@types/node": "^26.1.1",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@playwright/test": "^1.54.1",
     "typescript": "latest",
     "vitest": "latest"
   }

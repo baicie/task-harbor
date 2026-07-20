@@ -71,7 +71,7 @@ Extend 闲序 with model-facing project planning, versioned design documents, po
 - Streamable HTTP endpoint: `/mcp`.
 - Authentication: bearer token stored as a SHA-256 hash with workspace and scope.
 - Resource templates: `taskharbor://workspaces/{workspaceId}`, `/projects/{projectId}`, `/documents/{documentId}`.
-- Initial Tools: `list_projects`, `list_tasks`, `create_plan_draft`, `save_design_document`, `apply_plan`.
+- Tools include project/task reads, project health summaries, weekly-update drafts, plan previews, versioned document saves, reviewable plan drafts, and explicit idempotent plan application.
 - Every tool call enforces scope and records an audit event.
 
 ## Code Style

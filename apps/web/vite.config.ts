@@ -11,8 +11,8 @@ function gitCommit(fallback?:string) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname, '../..'), '')
-  const apiPort = Number(env.PORT ?? 8080)
-  const webPort = Number(env.WEB_PORT ?? 5173)
+  const apiPort = Number(process.env.PORT ?? env.PORT ?? 8080)
+  const webPort = Number(process.env.WEB_PORT ?? env.WEB_PORT ?? 5173)
 
   return {
     plugins: [react(), tailwindcss()],

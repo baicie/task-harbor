@@ -1,6 +1,8 @@
-import { DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { DragEvent, FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
+  Bell,
+  BellOff,
   ArrowRight,
   CalendarDays,
   Check,
@@ -41,7 +43,7 @@ import {
 } from "./board";
 import { api, type GitHubReference, type TaskColumnRole, type TaskImportPreview, type TaskWorkbookMapping } from "./api";
 import AuthScreen from "./AuthScreen";
-import WorkspacePage, { Page } from "./WorkspacePage";
+import type { Page } from "./WorkspacePage";
 import ChoiceSelect from "./components/ChoiceSelect";
 import {
   AlertDialog,
@@ -53,6 +55,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./components/ui/alert-dialog";
+
+const WorkspacePage = lazy(() => import("./WorkspacePage"));
 import {
   Avatar,
   AvatarFallback,
@@ -129,6 +133,7 @@ type BoardColumn = { id: string; label: string; accent: string };
 const copy = {
   zh: {
     overview: "概览",
+    inbox: "我的工作",
     myTasks: "我的任务",
     calendar: "日历",
     documents: "设计文档",
@@ -202,6 +207,7 @@ const copy = {
   },
   en: {
     overview: "Overview",
+    inbox: "My work",
     myTasks: "My tasks",
     calendar: "Calendar",
     documents: "Documents",
@@ -376,6 +382,14 @@ function Sidebar({
       </div>
       <nav aria-label="主导航">
         <p className="nav-label">{t.switchWorkspace}</p>
+        <Button
+          variant="ghost"
+          className={`nav-item ${page === "inbox" ? "active" : ""}`}
+          onClick={() => onNavigate("inbox")}
+        >
+          <Bell data-icon="inline-start" />
+          {t.inbox}
+        </Button>
         <Button
           variant="ghost"
           className={`nav-item ${page === "overview" ? "active" : ""}`}
@@ -643,9 +657,10 @@ function TaskDialog({
 }) {
   const [draft, setDraft] = useState<Task | null>(task);
   const [confirmingDelete,setConfirmingDelete]=useState(false),[deletingTask,setDeletingTask]=useState(false)
-  const [githubReferences,setGithubReferences]=useState<GitHubReference[]|null>(null),[githubLinks,setGithubLinks]=useState<GitHubReference[]>([]),[initialGithubLinks,setInitialGithubLinks]=useState<GitHubReference[]>([])
+  const [githubReferences,setGithubReferences]=useState<GitHubReference[]|null>(null),[githubLinks,setGithubLinks]=useState<GitHubReference[]>([]),[initialGithubLinks,setInitialGithubLinks]=useState<GitHubReference[]>([]),[watching,setWatching]=useState(false)
   useEffect(() => {setDraft(task);setConfirmingDelete(false);setDeletingTask(false)}, [task]);
   useEffect(()=>{if(!task||task.id==='new'){setGithubReferences(null);setGithubLinks([]);setInitialGithubLinks([]);return}let active=true;Promise.all([api.githubReferences(workspaceId),api.taskGitHubLinks(workspaceId,task.id)]).then(([references,links])=>{if(active){setGithubReferences(references.projectId===task.projectId?references.items:null);setGithubLinks(links);setInitialGithubLinks(links)}}).catch(()=>{if(active){setGithubReferences(null);setGithubLinks([]);setInitialGithubLinks([])}});return()=>{active=false}},[task?.id,workspaceId])
+  useEffect(()=>{if(!task||task.id==='new'){setWatching(false);return}let active=true;api.taskWatch(workspaceId,task.id).then(value=>active&&setWatching(value.watching)).catch(()=>active&&setWatching(false));return()=>{active=false}},[task?.id,workspaceId])
   if (!draft) return null;
   return (
     <Sheet open={Boolean(task)} onOpenChange={(open) => !open && onClose()}>
@@ -776,6 +791,7 @@ function TaskDialog({
           </FieldGroup></div>
           <SheetFooter className="task-sheet-footer">
             {draft.id!=="new"?<Button type="button" variant="destructive" className="task-delete-button" onClick={()=>setConfirmingDelete(true)}><Trash2 data-icon="inline-start"/>{t.deleteTask}</Button>:null}
+            {draft.id!=="new"?<Button type="button" variant="outline" onClick={()=>void api.setTaskWatch(workspaceId,draft.id,!watching).then(value=>setWatching(value.watching))}>{watching?<BellOff data-icon="inline-start"/>:<Bell data-icon="inline-start"/>}{watching?(t.taskDetails==='任务详情'?'取消关注':'Unfollow'):(t.taskDetails==='任务详情'?'关注任务':'Follow')}</Button>:null}
             <Button type="button" variant="outline" onClick={onClose}>
               {t.cancel}
             </Button>
@@ -1539,7 +1555,7 @@ export default function App() {
             )}
           </>
         ) : (
-          <WorkspacePage
+          <Suspense fallback={<section className="boot">{lang === "zh" ? "正在加载工作区…" : "Loading workspace…"}</section>}><WorkspacePage
             page={page}
             tasks={tasks}
             workspaceId={workspaceId}
@@ -1554,7 +1570,7 @@ export default function App() {
             onTaskDueChange={async (task,due)=>{try{await api.updateTask(workspaceId,{...task,due});await reload();toast.success(lang==='zh'?'截止日期已更新':'Due date updated')}catch(reason){setError(reason instanceof Error?reason.message:'更新截止日期失败')}}}
             workspaceRole={workspaces.find((item) => item.id === workspaceId)?.role ?? "VIEWER"}
             onWorkspaceRestored={async (id) => { const next=await api.workspaces();setWorkspaces(next);await loadWorkspace(id) }}
-          />
+          /></Suspense>
         )}
       </main>
       {project ? (

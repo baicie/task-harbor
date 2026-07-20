@@ -1,6 +1,8 @@
 import { DragEvent, FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import {
   CalendarDays,
+  Bell,
+  CheckCheck,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -13,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Task } from "./board";
-import { api } from "./api";
+import { api, type Notification } from "./api";
 import ChoiceSelect from "./components/ChoiceSelect";
 import { Avatar, AvatarFallback } from "./components/ui/avatar";
 import { Badge } from "./components/ui/badge";
@@ -58,7 +60,7 @@ const DocumentsPage = lazy(() => import("./features/documents/DocumentsPage"));
 const PlansPage = lazy(() => import("./features/plans/PlansPage"));
 
 export type Page =
-  "overview" | "tasks" | "calendar" | "plans" | "documents" | "archived" | "members" | "settings";
+  "overview" | "inbox" | "tasks" | "calendar" | "plans" | "documents" | "archived" | "members" | "settings";
 type Props = {
   page: Exclude<Page, "tasks">;
   tasks: Task[];
@@ -97,6 +99,8 @@ export default function WorkspacePage({
       Awaited<ReturnType<typeof api.members>>
     >([]),
     [archived, setArchived] = useState<Task[]>([]),
+    [mine, setMine] = useState<Task[]>([]),
+    [notifications, setNotifications] = useState<{items:Notification[];unread:number}>({items:[],unread:0}),
     [error, setError] = useState(""),
     [adding, setAdding] = useState(false);
   const en = lang === "en",
@@ -112,9 +116,11 @@ export default function WorkspacePage({
         .tasks(workspaceId, projectId, true)
         .then(setArchived)
         .catch((reason) => setError(reason.message));
+    if (page === "inbox") Promise.all([api.myTasks(workspaceId),api.notifications(workspaceId)]).then(([nextMine,nextNotifications])=>{setMine(nextMine);setNotifications(nextNotifications)}).catch(reason=>setError(reason.message));
   }, [page, workspaceId, projectId]);
   if (page === "documents") return <Suspense fallback={<main className="boot">{en ? "Loading documents…" : "正在加载文档…"}</main>}><DocumentsPage workspaceId={workspaceId} projects={projects} en={en} /></Suspense>;
   if (page === "plans") return <Suspense fallback={<main className="boot">{en ? "Loading plans…" : "正在加载计划…"}</main>}><PlansPage workspaceId={workspaceId} projects={projects} en={en} onApplied={onTasksChanged} /></Suspense>;
+  if (page === "inbox") return <PageShell title={en?'My work':'我的工作'} subtitle={en?'Assigned and followed tasks, with recent notifications':'集中查看负责或关注的任务与最新通知'} action={notifications.unread?<Button variant="outline" onClick={()=>void api.readNotifications(notifications.items.filter(item=>!item.isRead).map(item=>item.id)).then(()=>setNotifications(current=>({...current,unread:0,items:current.items.map(item=>({...item,isRead:true}))})))}><CheckCheck data-icon="inline-start"/>{en?'Mark all read':'全部已读'}</Button>:undefined}><div className="metric-grid"><Metric icon={<Bell/>} value={notifications.unread} label={en?'Unread notifications':'未读通知'}/><Metric icon={<CheckCircle2/>} value={mine.length} label={en?'Assigned or followed':'负责或关注'}/></div>{notifications.items.length?<div className="page-task-list">{notifications.items.map(item=><Card size="sm" key={item.id} data-unread={!item.isRead||undefined}><CardContent><Bell/><span><strong>{item.title}</strong><small>{item.body||item.actorName||''}</small></span><Badge variant={item.isRead?'secondary':'default'}>{item.isRead?(en?'Read':'已读'):(en?'New':'未读')}</Badge></CardContent></Card>)}</div>:null}<TaskRows tasks={mine} empty={en?'No assigned or followed tasks':'暂无负责或关注的任务'} en={en}/></PageShell>;
   if (page === "overview")
     return (
       <PageShell

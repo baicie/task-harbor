@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm run build && concurrently --kill-others --names types,server \"pnpm run dev:types\" \"pnpm run dev:server\"",
     "dev:types": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "dev:server": "node --env-file=../../.env --watch dist/main.js",
+    "dev:server": "node --env-file-if-exists=../../.env --watch dist/main.js",
     "build": "tsc -p tsconfig.json && node -e \"require('node:fs').cpSync('src/database/migrations', 'dist/database/migrations', { recursive: true })\"",
     "start": "node dist/main.js",
     "test": "vitest run --config vitest.config.ts",
