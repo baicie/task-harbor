@@ -51,6 +51,7 @@ button:not([data-slot="button"]) { color: inherit; }
 .auth-form input { height:42px;padding:0 12px;border:1px solid var(--ui-input);border-radius:8px;background:#fff; }
 .auth-form .primary { height:42px;margin-top:6px; }.auth-form .primary svg { margin-left:auto; }
 .auth-switch { border:0;background:transparent;color:var(--blue);font-size:11px;cursor:pointer; }
+.auth-closed-note { margin:0;color:var(--muted);font-size:11px;line-height:1.6;text-align:center; }
 .auth-error,.page-error { color:#b94030;font-size:11px; }.page-error{margin:12px 0 0;}
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(22,132,248,.22); outline-offset: 2px; }
 

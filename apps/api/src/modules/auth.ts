@@ -1,10 +1,11 @@
-import { Body, ConflictException, Controller, Get, HttpException, HttpStatus, Injectable, Post, Req, Res, UnauthorizedException } from '@nestjs/common'
+import { Body, ConflictException, Controller, ForbiddenException, Get, HttpException, HttpStatus, Injectable, Post, Req, Res, UnauthorizedException } from '@nestjs/common'
 import { hash, verify } from '@node-rs/argon2'
 import { randomBytes } from 'node:crypto'
 import type { Response } from 'express'
 import { DatabaseService } from '../database/database.service.js'
 import { AppRequest, Public, parse, sessionHash } from '../common/http.js'
 import { loginSchema, registerSchema } from '../common/contracts.js'
+import { authConfig } from '../common/auth-config.js'
 
 @Injectable()
 export class AuthService {
@@ -18,7 +19,19 @@ export class AuthService {
     item.count += 1
     if (item.count > maximum) throw new HttpException({ code: 'LOGIN_RATE_LIMIT', message: '尝试次数过多，请稍后再试' }, HttpStatus.TOO_MANY_REQUESTS)
   }
+  async registrationConfig() {
+    const config = authConfig()
+    const [{ count }] = await this.db.client<{ count: number }[]>`SELECT count(*)::int AS count FROM users`
+    return { ...config, bootstrapAvailable: Number(count) === 0 }
+  }
+  private async assertOpenRegistration() {
+    const [{ count }] = await this.db.client<{ count: number }[]>`SELECT count(*)::int AS count FROM users`
+    if (Number(count) === 0) return
+    const { registrationMode } = authConfig()
+    if (registrationMode !== 'open') throw new ForbiddenException({ code: 'REGISTRATION_CLOSED', message: '当前实例已关闭开放注册，请通过邀请或管理员开通账号' })
+  }
   async register(input: ReturnType<typeof registerSchema.parse>) {
+    await this.assertOpenRegistration()
     const passwordHash = await hash(input.password, { algorithm: 2 })
     const slug = `${input.workspaceName.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').slice(0, 32)}-${randomBytes(3).toString('hex')}`
     try { return await this.db.client.begin(async (sql) => {
@@ -53,6 +66,7 @@ export class AuthService {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService, private readonly db: DatabaseService) {}
+  @Public() @Get('config') config() { return this.auth.registrationConfig() }
   @Public() @Post('register') async register(@Body() body: unknown) { return this.auth.register(parse(registerSchema, body)) }
   @Public() @Post('login') async login(@Body() body: unknown, @Req() req: AppRequest, @Res({ passthrough: true }) res: Response) { const input = parse(loginSchema, body); const result = await this.auth.login(input.email, input.password, req.ip ?? 'unknown'); res.cookie('session', result.token, { httpOnly: true, secure: process.env.APP_ORIGIN?.startsWith('https://') ?? false, sameSite: 'lax', maxAge: 30 * 86400_000, path: '/' }); return { user: result.user, csrfToken: result.csrfToken } }
   @Get('me') me(@Req() req: AppRequest) { return { user: req.user, csrfToken: req.user!.csrfToken } }

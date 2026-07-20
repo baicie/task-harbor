@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Injectable, NotFoundExceptio
 import { z } from 'zod'
 import { randomBytes } from 'node:crypto'
 import { DatabaseService } from '../database/database.service.js'
+import { authConfig } from '../common/auth-config.js'
 import { memberSchema, workspaceSchema } from '../common/contracts.js'
 import { AppRequest, parse } from '../common/http.js'
 import { can, Permission, Role } from '../common/policy.js'
@@ -11,7 +12,14 @@ export class WorkspaceService {
   constructor(private readonly db: DatabaseService) {}
   async role(workspaceId: string, userId: string, permission: Permission) { const [row] = await this.db.client<{ role: Role }[]>`SELECT role FROM memberships WHERE workspace_id=${workspaceId} AND user_id=${userId} AND disabled_at IS NULL`; if (!row) throw new NotFoundException({ code: 'WORKSPACE_NOT_FOUND', message: '工作区不存在' }); if (!can(row.role, permission)) throw new ForbiddenException({ code: 'FORBIDDEN', message: '没有此操作权限' }); return row.role }
   async list(userId: string) { return this.db.client`SELECT w.id,w.name,w.slug,m.role FROM workspaces w JOIN memberships m ON m.workspace_id=w.id WHERE m.user_id=${userId} AND m.disabled_at IS NULL ORDER BY w.created_at` }
-  async create(userId: string, name: string) { const slug = `${name.toLowerCase().replace(/\W+/g,'-').slice(0,32)}-${randomBytes(3).toString('hex')}`; return this.db.client.begin(async sql => { const [workspace] = await sql`INSERT INTO workspaces(name,slug,created_by) VALUES(${name},${slug},${userId}) RETURNING id,name,slug`; await sql`INSERT INTO memberships(workspace_id,user_id,role) VALUES(${workspace!.id},${userId},'OWNER')`; return workspace }) }
+  async create(userId: string, name: string) {
+    const { allowWorkspaceCreate, registrationMode } = authConfig()
+    const [{ count }] = await this.db.client<{ count: number }[]>`SELECT count(*)::int AS count FROM workspaces`
+    if (!allowWorkspaceCreate && Number(count) > 0) throw new ForbiddenException({ code: 'WORKSPACE_CREATE_DISABLED', message: '当前实例已关闭新建工作区' })
+    if (registrationMode === 'admin_only') throw new ForbiddenException({ code: 'WORKSPACE_CREATE_DISABLED', message: '管理员模式下仅可通过邀请或管理员分配加入工作区' })
+    const slug = `${name.toLowerCase().replace(/\W+/g,'-').slice(0,32)}-${randomBytes(3).toString('hex')}`
+    return this.db.client.begin(async sql => { const [workspace] = await sql`INSERT INTO workspaces(name,slug,created_by) VALUES(${name},${slug},${userId}) RETURNING id,name,slug`; await sql`INSERT INTO memberships(workspace_id,user_id,role) VALUES(${workspace!.id},${userId},'OWNER')`; return workspace })
+  }
   async members(workspaceId: string, userId: string) { await this.role(workspaceId,userId,'member.read'); return this.db.client`SELECT u.id,u.name,u.email,m.role,m.disabled_at AS "disabledAt" FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.workspace_id=${workspaceId} ORDER BY m.joined_at` }
   async addMember(workspaceId: string, userId: string, email: string, role: Role) { await this.role(workspaceId,userId,'member.manage'); const [target] = await this.db.client<{ id: string }[]>`SELECT id FROM users WHERE email=${email.toLowerCase()}`; if (!target) throw new NotFoundException({ code:'USER_NOT_FOUND',message:'该邮箱尚未注册' }); await this.db.client`INSERT INTO memberships(workspace_id,user_id,role) VALUES(${workspaceId},${target.id},${role}) ON CONFLICT(workspace_id,user_id) DO UPDATE SET role=${role},disabled_at=NULL`; return { ok:true } }
 }

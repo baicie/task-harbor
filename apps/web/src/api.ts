@@ -22,11 +22,19 @@ const mapTask=(task:RawTask):Task=>({id:task.id,number:task.number,projectId:tas
 
 async function uploadFields<T>(path:string,file:File,fields:Record<string,string>){const body=new FormData();body.append('file',file);Object.entries(fields).forEach(([key,value])=>body.append(key,value));const response=await fetch('/api/v1'+path,{method:'POST',body,credentials:'include',headers:csrf?{'x-csrf-token':csrf}:{}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||'上传失败');return data as T}
 
+export type RegistrationMode = 'open' | 'invite_only' | 'admin_only'
+export type AuthConfig = {
+  registrationMode: RegistrationMode
+  allowWorkspaceCreate: boolean
+  bootstrapAvailable: boolean
+}
+
 const base='/api/v1'
 let csrf=''
 async function request<T>(path:string,init:RequestInit={}){const response=await fetch(base+path,{...init,credentials:'include',headers:{'content-type':'application/json',...(csrf?{'x-csrf-token':csrf}:{}),...init.headers}}),text=await response.text();let data:any=null;try{data=text?JSON.parse(text):null}catch{data=null}if(!response.ok)throw new Error(data?.message||'请求失败');return data as T}
 async function upload<T>(path:string,file:File){const body=new FormData();body.append('file',file);const response=await fetch(base+path,{method:'POST',body,credentials:'include',headers:csrf?{'x-csrf-token':csrf}:{}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||'上传失败');return data as T}
 export const api={
+  authConfig(){return request<AuthConfig>('/auth/config')},
   async me(){const data=await request<{user:{id:string;name:string};csrfToken:string}>('/auth/me');csrf=data.csrfToken;return data},
   async login(email:string,password:string){const data=await request<{user:{id:string;name:string};csrfToken:string}>('/auth/login',{method:'POST',body:JSON.stringify({email,password})});csrf=data.csrfToken;return data},
   register(input:{email:string;name:string;password:string;workspaceName:string}){return request('/auth/register',{method:'POST',body:JSON.stringify(input)})},
