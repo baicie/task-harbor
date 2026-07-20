@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { documentCreateSchema, documentUpdateSchema, planCreateSchema, taskBulkSchema, taskPatchSchema, taskSchema } from './contracts.js'
+import { documentCreateSchema, documentUpdateSchema, planCreateSchema, projectSchema, taskBulkSchema, taskPatchSchema, taskSchema } from './contracts.js'
 
 describe('task type contract',()=>{
   const base={projectId:'11111111-1111-4111-8111-111111111111',columnId:'22222222-2222-4222-8222-222222222222',title:'修复登录失败'}
@@ -41,5 +41,12 @@ describe('document contracts', () => {
   it('requires the current version when updating content', () => {
     expect(documentUpdateSchema.safeParse({ content: '# 新内容' }).success).toBe(false)
     expect(documentUpdateSchema.parse({ content: '# 新内容', version: 2 }).version).toBe(2)
+  })
+})
+
+describe('project contracts',()=>{
+  it('defaults to the delivery workflow and accepts built-in templates',()=>{
+    expect(projectSchema.parse({name:'研发',code:'DEV'}).workflowTemplate).toBe('DELIVERY')
+    expect(projectSchema.parse({name:'轻量',code:'LITE',workflowTemplate:'SIMPLE'}).workflowTemplate).toBe('SIMPLE')
   })
 })

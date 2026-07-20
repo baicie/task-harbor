@@ -8,7 +8,7 @@ export const setupPasswordSchema = z.object({ token: z.string().min(16), passwor
 export const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) }).strict()
 export const workspaceSchema = z.object({ name: z.string().trim().min(1).max(80) }).strict()
 export const memberSchema = z.object({ email: z.string().email(), role: z.enum(['ADMIN','MEMBER','VIEWER']) }).strict()
-export const projectSchema = z.object({ name: z.string().trim().min(1).max(120), code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,8}$/), description: z.string().max(4000).default(''), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#2367d1') }).strict()
+export const projectSchema = z.object({ name: z.string().trim().min(1).max(120), code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,8}$/), description: z.string().max(4000).default(''), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#2367d1'), workflowTemplate: z.enum(['SIMPLE','DELIVERY','RELEASE']).default('DELIVERY') }).strict()
 export const taskTypeFieldsSchema = z.object({
   workContent: z.string().max(20000).default(''),
   completionCriteria: z.string().max(10000).default(''),
