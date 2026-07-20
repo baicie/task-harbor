@@ -1,3 +1,5 @@
+import type { TaskKind } from './board'
+
 export type BugSeverity='BLOCKER'|'CRITICAL'|'MAJOR'|'MINOR'
 
 export type TaskTypeFields={
@@ -31,4 +33,3 @@ const fieldKeys={
 export function taskTypeFieldKeys(kind:TaskKind):readonly (keyof TaskTypeFields)[]{
   return fieldKeys[kind]
 }
-import type { TaskKind } from './board'

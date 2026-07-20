@@ -15,7 +15,7 @@ const labels={
 export default function TaskTypeFieldsEditor({kind,value,en,onChange}:Props){
   const text=en?labels.en:labels.zh
   const set=(key:keyof TaskTypeFields,next:string)=>onChange({...value,[key]:next})
-  const textarea=(key:keyof TaskTypeFields,rows:number,required=false)=><Field key={key}><FieldLabel htmlFor={`task-type-${key}`}>{text[key as keyof typeof text] as string}{required?' *':''}</FieldLabel><Textarea id={`task-type-${key}`} rows={rows} required={required} value={String(value[key])} onChange={event=>set(key,event.target.value)}/></Field>
+  const textarea=(key:keyof TaskTypeFields,rows:number,required=false)=><Field key={key}><FieldLabel htmlFor={`task-type-${key}`}>{text[key]}{required?' *':''}</FieldLabel><Textarea id={`task-type-${key}`} rows={rows} required={required} value={String(value[key])} onChange={event=>set(key,event.target.value)}/></Field>
 
   return <section className="task-type-fields" aria-labelledby="task-type-fields-heading">
     <h3 id="task-type-fields-heading">{text.heading[kind]}</h3>
