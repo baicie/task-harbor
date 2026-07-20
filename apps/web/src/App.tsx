@@ -45,6 +45,7 @@ import {
 import { api, type GitHubReference, type TaskColumnRole, type TaskImportPreview, type TaskWorkbookMapping } from "./api";
 import AuthScreen from "./AuthScreen";
 import InviteScreen from "./InviteScreen";
+import SetupScreen from "./SetupScreen";
 import ChoiceSelect from "./components/ChoiceSelect";
 import {
   appPaths,
@@ -1321,8 +1322,10 @@ export default function App() {
   };
   if (auth === "loading") return <main className="boot">正在连接工作区…</main>;
   const inviteToken = matchPath(appPaths.invitePattern, location.pathname)?.params.token;
+  const setupToken = matchPath(appPaths.setupPattern, location.pathname)?.params.token;
   if (auth === "out") {
     if (inviteToken) return <InviteScreen token={decodeURIComponent(inviteToken)} onReady={() => void boot()} />;
+    if (setupToken) return <SetupScreen token={decodeURIComponent(setupToken)} onReady={() => void boot()} />;
     return location.pathname === appPaths.login ? (
       <AuthScreen onReady={() => void boot()} />
     ) : (

@@ -17,8 +17,8 @@ describe('authConfig', () => {
     expect(authConfig()).toEqual({ registrationMode: 'invite_only', allowWorkspaceCreate: false })
   })
 
-  it('falls back to open for unknown modes', () => {
+  it('falls back to admin-only registration for unknown modes', () => {
     process.env.AUTH_REGISTRATION_MODE = 'invalid'
-    expect(authConfig().registrationMode).toBe('open')
+    expect(authConfig().registrationMode).toBe('admin_only')
   })
 })

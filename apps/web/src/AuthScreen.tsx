@@ -23,8 +23,8 @@ export default function AuthScreen({ onReady }: { onReady: () => void }) {
       .then(setConfig)
       .catch(() =>
         setConfig({
-          registrationMode: "open",
-          allowWorkspaceCreate: true,
+          registrationMode: "admin_only",
+          allowWorkspaceCreate: false,
           bootstrapAvailable: false,
         }),
       );
