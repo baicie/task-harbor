@@ -1,4 +1,5 @@
 import type { Task } from './board'
+import { createTaskTypeFields } from './taskFields'
 
 export type DocumentKind = 'ARCHITECTURE' | 'REQUIREMENT' | 'DESIGN' | 'MEETING' | 'RETROSPECTIVE'
 export type WorkspaceDocument = { id:string;projectId:string|null;folderId:string|null;title:string;kind:DocumentKind;status:'DRAFT'|'PUBLISHED'|'ARCHIVED';content:string;version:number;createdAt:string;updatedAt:string }
@@ -21,7 +22,7 @@ export type WorkspaceInvitation={id:string;email:string;role:string;status:Invit
 export type AuditLog={id:string;action:string;entityType:string;entityId:string|null;beforeData:Record<string,unknown>|null;afterData:Record<string,unknown>|null;requestId:string;createdAt:string;actorName:string|null;actorEmail:string|null}
 type RawTask={id:string;number:number;projectId:string;columnId:string;title:string;description:string;kind:Task['kind'];priority:'HIGH'|'MEDIUM'|'LOW';dueDate:string|null;version:number;subtaskDone:number;subtaskTotal:number;assignees:{id:string;name:string}[];labels:string[]}
 
-const mapTask=(task:RawTask):Task=>({id:task.id,number:task.number,projectId:task.projectId,title:task.title,description:task.description,kind:task.kind,column:task.columnId,priority:{HIGH:'高',MEDIUM:'中',LOW:'低'}[task.priority] as Task['priority'],assignee:task.assignees[0]?.name??'未分配',assigneeId:task.assignees[0]?.id??'',due:task.dueDate??'',tags:task.labels,version:task.version,subtaskDone:task.subtaskDone,subtaskTotal:task.subtaskTotal})
+const mapTask=(task:RawTask):Task=>({id:task.id,number:task.number,projectId:task.projectId,title:task.title,description:task.description,kind:task.kind,column:task.columnId,priority:{HIGH:'高',MEDIUM:'中',LOW:'低'}[task.priority] as Task['priority'],assignee:task.assignees[0]?.name??'未分配',assigneeId:task.assignees[0]?.id??'',due:task.dueDate??'',tags:task.labels,typeFields:createTaskTypeFields(),version:task.version,subtaskDone:task.subtaskDone,subtaskTotal:task.subtaskTotal})
 
 async function uploadFields<T>(path:string,file:File,fields:Record<string,string>){const body=new FormData();body.append('file',file);Object.entries(fields).forEach(([key,value])=>body.append(key,value));const response=await fetch('/api/v1'+path,{method:'POST',body,credentials:'include',headers:csrf?{'x-csrf-token':csrf}:{}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||'上传失败');return data as T}
 

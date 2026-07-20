@@ -43,6 +43,7 @@ import {
   moveTask,
 } from "./board";
 import { api, type GitHubReference, type TaskColumnRole, type TaskImportPreview, type TaskWorkbookMapping } from "./api";
+import { createTaskTypeFields } from "./taskFields";
 import AuthScreen from "./AuthScreen";
 import InviteScreen from "./InviteScreen";
 import SetupScreen from "./SetupScreen";
@@ -1202,6 +1203,7 @@ export default function App() {
         due,
         tags: [],
         description: "",
+        typeFields: createTaskTypeFields(),
         version: 1,
       });
   };
@@ -1211,7 +1213,7 @@ export default function App() {
     if(!title||!project||!column)return
     setQuickBusy(true);setError('')
     try{
-      await api.createTask(workspaceId,{id:'new',number:0,projectId:project.id,title,kind:'TASK',column:column.id,priority:'中',assignee:user,assigneeId:members.find(member=>member.name===user)?.id??'',due:'',tags:[],description:'',version:1})
+      await api.createTask(workspaceId,{id:'new',number:0,projectId:project.id,title,kind:'TASK',column:column.id,priority:'中',assignee:user,assigneeId:members.find(member=>member.name===user)?.id??'',due:'',tags:[],description:'',typeFields:createTaskTypeFields(),version:1})
       setQuickTitle('');await reload();toast.success(lang==='zh'?'任务已创建':'Task created')
     }catch(reason){setError(reason instanceof Error?reason.message:(lang==='zh'?'创建失败':'Creation failed'))}
     finally{setQuickBusy(false)}
