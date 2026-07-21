@@ -20,11 +20,7 @@ import { toast } from 'sonner'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Task } from '@/models/board'
 import { api, type AuthConfig, type Notification } from '@/api'
-import {
-  appPaths,
-  getSettingsSectionFromPath,
-  type SettingsSection,
-} from '@/app/routes'
+import { appPaths, getSettingsSectionFromPath, type SettingsSection } from '@/app/routes'
 import ChoiceSelect from '@/components/ChoiceSelect'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -410,9 +406,7 @@ export default function WorkspacePage({
       <Tabs
         orientation="vertical"
         value={settingsSection}
-        onValueChange={(section) =>
-          navigate(appPaths.settingsSection(section as SettingsSection))
-        }
+        onValueChange={(section) => navigate(appPaths.settingsSection(section as SettingsSection))}
         className="settings-tabs"
       >
         <TabsList aria-label={en ? 'Settings sections' : '设置分类'}>

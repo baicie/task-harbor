@@ -22,6 +22,7 @@ The following components are currently installed in `apps/web/src/components/ui`
 - input-group
 - kbd
 - label
+- progress
 - resizable
 - scroll-area
 - select
@@ -30,6 +31,7 @@ The following components are currently installed in `apps/web/src/components/ui`
 - sidebar
 - skeleton
 - sonner
+- table
 - tabs
 - textarea
 - toggle
