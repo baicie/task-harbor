@@ -47,6 +47,9 @@ test('opens the document context menu at the pointer position', async ({ page })
 
   await page.goto('/documents')
   await expect(page.getByRole('heading', { name: '设计文档' })).toBeVisible()
+  await page.locator('.documents-page').evaluate(async element => {
+    await Promise.all(element.getAnimations().map(animation => animation.finished))
+  })
 
   const documentList = page.locator('.document-list')
   const listBox = await documentList.boundingBox()
