@@ -1,40 +1,62 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileText, Files, HardDrive, Trash2, Upload } from 'lucide-react'
+import { Files, HardDrive, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, type Asset } from '@/api'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import AssetTable from '@/components/settings/AssetTable'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { assetAccept, assetExtension, isPreviewableAsset } from '@/lib/assets'
-
-const size = (bytes: number) =>
-  bytes < 1024
-    ? `${bytes} B`
-    : bytes < 1024 * 1024
-      ? `${(bytes / 1024).toFixed(1)} KB`
-      : `${(bytes / 1024 / 1024).toFixed(1)} MB`
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
+import { assetAccept, formatAssetSize } from '@/lib/assets'
 
 export default function AssetsPanel({ workspaceId, en }: { workspaceId: string; en: boolean }) {
   const input = useRef<HTMLInputElement>(null),
     [assets, setAssets] = useState<Asset[]>([]),
     [usage, setUsage] = useState({ usedBytes: 0, quotaBytes: 1 }),
     [quotaMb, setQuotaMb] = useState(1024),
+    [selected, setSelected] = useState<string[]>([]),
+    [pendingDelete, setPendingDelete] = useState<string[]>([]),
+    [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false)
-  const load = useCallback(
-    () =>
-      api
-        .assets(workspaceId)
-        .then((result) => {
-          setAssets(result.assets)
-          setUsage(result.usage)
-          setQuotaMb(Math.round(result.usage.quotaBytes / 1024 / 1024))
-        })
-        .catch((reason) => toast.error(reason instanceof Error ? reason.message : '资源加载失败')),
-    [workspaceId],
-  )
+  const load = useCallback(async () => {
+    try {
+      const result = await api.assets(workspaceId)
+      setAssets(result.assets)
+      setUsage(result.usage)
+      setQuotaMb(Math.round(result.usage.quotaBytes / 1024 / 1024))
+      setSelected((current) =>
+        current.filter((id) => result.assets.some((asset) => asset.id === id)),
+      )
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : '资源加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [workspaceId])
   useEffect(() => {
     void load()
   }, [load])
+
   const upload = async (file?: File) => {
     if (!file) return
     setBusy(true)
@@ -57,15 +79,17 @@ export default function AssetsPanel({ workspaceId, en }: { workspaceId: string; 
       if (input.current) input.current.value = ''
     }
   }
-  const remove = async (asset: Asset) => {
+  const remove = async () => {
     setBusy(true)
     try {
-      await api.deleteAsset(workspaceId, asset.id)
-      await load()
-      toast.success(en ? 'Resource deleted' : '资源已删除')
+      await Promise.all(pendingDelete.map((id) => api.deleteAsset(workspaceId, id)))
+      toast.success(en ? 'Resources deleted' : '资源已删除')
+      setSelected((current) => current.filter((id) => !pendingDelete.includes(id)))
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : '删除失败')
     } finally {
+      setPendingDelete([])
+      await load()
       setBusy(false)
     }
   }
@@ -82,120 +106,132 @@ export default function AssetsPanel({ workspaceId, en }: { workspaceId: string; 
     }
   }
   const percent = Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100)
+
   return (
-    <Card className="settings-panel">
-      <CardHeader>
-        <CardTitle>
-          <HardDrive />
-          {en ? 'Static resources' : '静态资源'}
-        </CardTitle>
-        <CardDescription>
-          {en
-            ? 'Images and design deliverables are deduplicated. Referenced files cannot be deleted.'
-            : '图片与设计交付物按内容去重；评论仍在引用的文件不可删除。'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="asset-usage">
-          <span>
-            <strong>
-              {size(usage.usedBytes)} / {size(usage.quotaBytes)}
-            </strong>
-            <small>{en ? 'Workspace storage' : '工作区资源用量'}</small>
-          </span>
-          <div>
-            <i style={{ width: `${percent}%` }} />
+    <>
+      <Card className="settings-panel asset-manager">
+        <CardHeader>
+          <CardTitle>
+            <HardDrive />
+            {en ? 'Static resources' : '静态资源管理'}
+          </CardTitle>
+          <CardDescription>
+            {en
+              ? 'Review uploads, usage and references. Referenced files cannot be deleted.'
+              : '查看上传时间、空间占用和使用情况；仍被评论引用的文件不可删除。'}
+          </CardDescription>
+          <CardAction>
+            <input
+              ref={input}
+              hidden
+              type="file"
+              accept={assetAccept}
+              onChange={(event) => void upload(event.target.files?.[0])}
+            />
+            <Button variant="outline" disabled={busy} onClick={() => input.current?.click()}>
+              <Upload data-icon="inline-start" />
+              {en ? 'Upload' : '上传文件'}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <div className="asset-usage">
+            <span>
+              <strong>
+                {formatAssetSize(usage.usedBytes)} / {formatAssetSize(usage.quotaBytes)}
+              </strong>
+              <small>{en ? 'Workspace storage' : '工作区资源用量'}</small>
+            </span>
+            <Progress value={percent} aria-label={en ? 'Storage usage' : '存储空间用量'} />
           </div>
-          <input
-            ref={input}
-            hidden
-            type="file"
-            accept={assetAccept}
-            onChange={(event) => void upload(event.target.files?.[0])}
-          />
-          <Button variant="outline" disabled={busy} onClick={() => input.current?.click()}>
-            <Upload data-icon="inline-start" />
-            {en ? 'Upload file' : '上传文件'}
-          </Button>
-        </div>
-        <div className="asset-quota">
-          <span>
-            <strong>{en ? 'Storage limit' : '容量上限'}</strong>
-            <small>
-              {en ? 'Administrators can set 1 MB to 100 TB' : '管理员可设置 1 MB 至 100 TB'}
-            </small>
-          </span>
-          <Input
-            type="number"
-            min={1}
-            max={104857600}
-            step={1}
-            value={quotaMb}
-            onChange={(event) => setQuotaMb(Number(event.target.value))}
-          />
-          <b>MB</b>
-          <Button
-            size="sm"
-            disabled={
-              busy ||
-              !Number.isInteger(quotaMb) ||
-              quotaMb < 1 ||
-              quotaMb > 104857600 ||
-              quotaMb * 1024 * 1024 < usage.usedBytes
-            }
-            onClick={() => void saveQuota()}
-          >
-            {en ? 'Save limit' : '保存上限'}
-          </Button>
-        </div>
-        {assets.length ? (
-          <div className="asset-list">
-            {assets.map((asset) => (
-              <div key={asset.id}>
-                <a href={api.assetUrl(workspaceId, asset.id)} target="_blank" rel="noreferrer">
-                  {isPreviewableAsset(asset.contentType) ? (
-                    <img src={api.assetUrl(workspaceId, asset.id)} alt="" />
-                  ) : (
-                    <span className="asset-file-icon">
-                      <FileText />
-                      <b>{assetExtension(asset.originalName)}</b>
-                    </span>
-                  )}
-                  <span>
-                    <strong>{asset.originalName}</strong>
-                    <small>
-                      {size(asset.sizeBytes)} · {asset.referenceCount}{' '}
-                      {en ? 'references' : '处引用'}
-                    </small>
-                  </span>
-                </a>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  disabled={busy || asset.referenceCount > 0}
-                  title={
-                    asset.referenceCount
-                      ? en
-                        ? 'Still referenced'
-                        : '仍被评论引用'
-                      : en
-                        ? 'Delete'
-                        : '删除'
-                  }
-                  onClick={() => void remove(asset)}
-                >
-                  <Trash2 />
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="asset-empty">
-            <Files />
-            <span>{en ? 'No uploaded files' : '暂无静态资源'}</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          <Field orientation="responsive" className="asset-quota">
+            <FieldContent>
+              <FieldLabel htmlFor="asset-quota">{en ? 'Storage limit' : '容量上限'}</FieldLabel>
+              <FieldDescription>
+                {en ? 'Administrators can set 1 MB to 100 TB' : '管理员可设置 1 MB 至 100 TB'}
+              </FieldDescription>
+            </FieldContent>
+            <div className="asset-quota-control">
+              <Input
+                id="asset-quota"
+                type="number"
+                min={1}
+                max={104857600}
+                step={1}
+                value={quotaMb}
+                onChange={(event) => setQuotaMb(Number(event.target.value))}
+              />
+              <span>MB</span>
+              <Button
+                size="sm"
+                disabled={
+                  busy ||
+                  !Number.isInteger(quotaMb) ||
+                  quotaMb < 1 ||
+                  quotaMb > 104857600 ||
+                  quotaMb * 1024 * 1024 < usage.usedBytes
+                }
+                onClick={() => void saveQuota()}
+              >
+                {en ? 'Save' : '保存'}
+              </Button>
+            </div>
+          </Field>
+          {assets.length ? (
+            <AssetTable
+              assets={assets}
+              selected={selected}
+              setSelected={setSelected}
+              busy={busy}
+              workspaceId={workspaceId}
+              en={en}
+              onDelete={setPendingDelete}
+            />
+          ) : loading ? (
+            <div
+              className="asset-loading"
+              aria-label={en ? 'Loading resources' : '正在加载静态资源'}
+            >
+              <Skeleton />
+              <Skeleton />
+              <Skeleton />
+            </div>
+          ) : (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Files />
+                </EmptyMedia>
+                <EmptyTitle>{en ? 'No uploaded files' : '暂无静态资源'}</EmptyTitle>
+                <EmptyDescription>
+                  {en ? 'Upload a file to manage it here.' : '上传文件后，可在这里查看和管理。'}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </CardContent>
+      </Card>
+      <AlertDialog
+        open={pendingDelete.length > 0}
+        onOpenChange={(open) => !open && setPendingDelete([])}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{en ? 'Delete resources?' : '删除静态资源？'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {en
+                ? `${pendingDelete.length} selected file(s) will be permanently deleted.`
+                : `将永久删除选中的 ${pendingDelete.length} 个文件，此操作无法撤销。`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{en ? 'Cancel' : '取消'}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={busy} onClick={() => void remove()}>
+              {en ? 'Delete' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
