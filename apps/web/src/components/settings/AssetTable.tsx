@@ -144,9 +144,13 @@ export default function AssetTable({
                   </span>
                 </AssetPreview>
               </TableCell>
-              <TableCell>{formatAssetSize(asset.sizeBytes)}</TableCell>
-              <TableCell>{date.format(new Date(asset.createdAt))}</TableCell>
-              <TableCell>
+              <TableCell data-label={en ? 'Size' : '大小'}>
+                {formatAssetSize(asset.sizeBytes)}
+              </TableCell>
+              <TableCell data-label={en ? 'Uploaded' : '上传时间'}>
+                {date.format(new Date(asset.createdAt))}
+              </TableCell>
+              <TableCell data-label={en ? 'Used in' : '使用情况'}>
                 <Badge variant={asset.referenceCount ? 'secondary' : 'outline'}>
                   {asset.referenceCount
                     ? en
@@ -157,7 +161,7 @@ export default function AssetTable({
                       : '未使用'}
                 </Badge>
               </TableCell>
-              <TableCell>
+              <TableCell data-label={en ? 'Actions' : '操作'}>
                 <Button
                   size="icon-sm"
                   variant="ghost"

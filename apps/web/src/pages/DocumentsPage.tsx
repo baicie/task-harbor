@@ -58,6 +58,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -139,6 +147,7 @@ export default function DocumentsPage({
         rename: 'Rename',
         duplicate: 'Duplicate',
         move: 'Move to...',
+        actions: 'Document actions',
         remove: 'Delete',
         refresh: 'Refresh',
         folderName: 'Folder name',
@@ -165,6 +174,7 @@ export default function DocumentsPage({
         rename: '重命名',
         duplicate: '创建副本',
         move: '移动到...',
+        actions: '文档操作',
         remove: '删除',
         refresh: '刷新',
         folderName: '文件夹名称',
@@ -687,18 +697,21 @@ function DocumentNode({
 } & DocumentMenuProps) {
   return (
     <DocumentContextMenu target={{ type: 'document', document: item }} {...menuProps}>
-      <button
-        className={`document-tree-row document-file ${selected ? 'active' : ''}`}
-        onClick={() => onOpen(item.id)}
-        onMouseEnter={() => onPrefetch(item.id)}
-      >
-        <File />
-        <span>
-          <strong>{item.title}</strong>
-          <small>{item.projectName || zhKind[item.kind]}</small>
-        </span>
-        <Badge variant="secondary">v{item.version}</Badge>
-      </button>
+      <div className="document-tree-entry">
+        <button
+          className={`document-tree-row document-file ${selected ? 'active' : ''}`}
+          onClick={() => onOpen(item.id)}
+          onMouseEnter={() => onPrefetch(item.id)}
+        >
+          <File />
+          <span>
+            <strong>{item.title}</strong>
+            <small>{item.projectName || zhKind[item.kind]}</small>
+          </span>
+          <Badge variant="secondary">v{item.version}</Badge>
+        </button>
+        <DocumentActionsMenu target={{ type: 'document', document: item }} {...menuProps} />
+      </div>
     </DocumentContextMenu>
   )
 }
@@ -731,13 +744,15 @@ function FolderNode({
   return (
     <div className="document-folder">
       <DocumentContextMenu target={{ type: 'folder', folder }} {...menuProps}>
-        <button className="document-tree-row folder-row" onClick={() => onToggle(folder.id)}>
-          {open ? <ChevronDown /> : <ChevronRight />}
-          {open ? <FolderOpen /> : <Folder />}
-          <strong>{folder.name}</strong>
-          <small>{children.length + documents.length}</small>
-          <MoreHorizontal aria-label={en ? 'Folder menu' : '文件夹菜单'} />
-        </button>
+        <div className="document-tree-entry">
+          <button className="document-tree-row folder-row" onClick={() => onToggle(folder.id)}>
+            {open ? <ChevronDown /> : <ChevronRight />}
+            {open ? <FolderOpen /> : <Folder />}
+            <strong>{folder.name}</strong>
+            <small>{children.length + documents.length}</small>
+          </button>
+          <DocumentActionsMenu target={{ type: 'folder', folder }} {...menuProps} />
+        </div>
       </DocumentContextMenu>
       {open ? (
         <div className="document-folder-children">
@@ -769,6 +784,71 @@ function FolderNode({
         </div>
       ) : null}
     </div>
+  )
+}
+
+function DocumentActionsMenu({
+  target,
+  labels,
+  onNewDocument,
+  onNewFolder,
+  onRename,
+  onDuplicate,
+  onMove,
+  onRemove,
+}: { target: Exclude<MenuTarget, { type: 'root' }> } & DocumentMenuProps) {
+  const document = target.type === 'document' ? target.document : null
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button type="button" size="icon-sm" variant="ghost" aria-label={labels.actions} />}
+      >
+        <MoreHorizontal />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuGroup>
+          {target.type === 'folder' ? (
+            <>
+              <DropdownMenuItem onClick={() => onNewDocument(target.folder.id)}>
+                <FilePlus2 />
+                {labels.newDocument}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onNewFolder(target.folder.id)}>
+                <FolderPlus />
+                {labels.newFolder}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <DropdownMenuItem
+            onClick={() => onRename(target.type === 'folder' ? target.folder : target.document)}
+          >
+            <Pencil />
+            {labels.rename}
+          </DropdownMenuItem>
+          {document ? (
+            <>
+              <DropdownMenuItem onClick={() => onDuplicate(document)}>
+                <Copy />
+                {labels.duplicate}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMove(document)}>
+                <Move />
+                {labels.move}
+              </DropdownMenuItem>
+            </>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => onRemove(target.type === 'folder' ? target.folder : target.document)}
+          >
+            <Trash2 />
+            {labels.remove}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
